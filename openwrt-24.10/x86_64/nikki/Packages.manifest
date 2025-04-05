@@ -1,0 +1,66 @@
+Package: luci-app-nikki
+Version: 1.21.2-r1
+Depends: libc, luci-base, nikki
+Source: /feed/openwrt-nikki/luci-app-nikki
+SourceName: luci-app-nikki
+Section: luci
+SourceDateEpoch: 1743827998
+URL: https://github.com/openwrt/luci
+Maintainer: OpenWrt LuCI community
+Architecture: all
+Installed-Size: 61440
+Filename: luci-app-nikki_1.21.2-r1_all.ipk
+Size: 9549
+SHA256sum: 5666f157eefcf6ba6b019385b28dcea7c1d2829db56808e77e2cd19377af5c58
+Description:  LuCI Support for nikki
+
+Package: luci-i18n-nikki-zh-cn
+Version: 25.095.16798~69f9081
+Depends: libc, luci-app-nikki
+Source: /feed/openwrt-nikki/luci-app-nikki
+SourceName: luci-app-nikki
+Section: luci
+SourceDateEpoch: 1743827998
+Architecture: all
+Installed-Size: 20480
+Filename: luci-i18n-nikki-zh-cn_25.095.16798~69f9081_all.ipk
+Size: 4650
+SHA256sum: 5b3644131a2b3da64bdc3cc55bae9d5dc75d3e2a4d261cbc367772b479242cd1
+Description:  Translation for luci-app-nikki - 简体中文 (Chinese Simplified)
+
+Package: nikki-geodata
+Version: 2025.04.05
+Depends: libc
+Source: /feed/nikki-geodata
+SourceName: nikki-geodata
+License: GPL-3.0
+LicenseFiles: LICENSE
+Section: net
+SourceDateEpoch: 1742559522
+URL: https://wiki.metacubex.one
+Maintainer: apois <apoislau@gmail.com>
+Architecture: all
+Installed-Size: 47339520
+Filename: nikki-geodata_2025.04.05_all.ipk
+Size: 15730938
+SHA256sum: 4e769f1e85950f8a2e43d648ea323dd0659a9220e7452c3b37c67b5d0e6bf6c1
+Description:  Nikki Geodata (GeoIP, Geosite, ASN, Country)
+
+Package: nikki
+Version: 2025.04.05~2a08c44f-r1
+Depends: libc, ca-bundle, curl, yq, firewall4, ip-full, kmod-inet-diag, kmod-nft-socket, kmod-nft-tproxy, kmod-tun
+Provides: mihomo
+Source: /feed/openwrt-nikki/nikki
+SourceName: nikki
+License: GPL3.0+
+Section: net
+SourceDateEpoch: 1743827998
+URL: https://wiki.metacubex.one
+Maintainer: Joseph Mory <morytyann@gmail.com>
+Architecture: x86_64
+Installed-Size: 32819200
+Filename: nikki_2025.04.05~2a08c44f-r1_x86_64.ipk
+Size: 12035894
+SHA256sum: e3d862fa898ee3d0d7b6d732cde8173d8f2c8067ee649258bd9035618c2511ad
+Description:  A rule based proxy in Go.
+
