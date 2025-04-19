@@ -1,0 +1,105 @@
+name: update packages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 1,4,7,10,13 * * *"
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  get_current_info:
+    runs-on: ubuntu-latest
+    outputs:
+      pkg_source_version: ${{ steps.get_current_info.outputs.pkg_source_version }}
+      pkg_mirror_hash: ${{ steps.get_current_info.outputs.pkg_mirror_hash }}
+      pkg_build_version: ${{ steps.get_current_info.outputs.pkg_build_version }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          repository: apoiston/openwrt-nikki
+          ref: main
+          path: openwrt-nikki
+
+      - name: get current info
+        id: get_current_info
+        run: |
+          echo "pkg_source_version=$(grep "PKG_SOURCE_VERSION:=" openwrt-nikki/nikki/Makefile | cut -d '=' -f 2)" >> $GITHUB_OUTPUT
+          echo "pkg_mirror_hash=$(grep "PKG_MIRROR_HASH:=" openwrt-nikki/nikki/Makefile | cut -d '=' -f 2)" >> $GITHUB_OUTPUT
+          echo "pkg_build_version=$(grep "PKG_BUILD_VERSION:=" openwrt-nikki/nikki/Makefile | cut -d '=' -f 2)" >> $GITHUB_OUTPUT
+
+  get_latest_info:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_date: ${{ steps.get_latest_info.outputs.commit_date }}
+      commit_sha: ${{ steps.get_latest_info.outputs.commit_sha }}
+      short_commit_sha: ${{ steps.get_latest_info.outputs.short_commit_sha }}
+      checksum: ${{ steps.get_latest_info.outputs.checksum }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          repository: 'MetaCubeX/mihomo'
+          ref: 'Alpha'
+          path: 'mihomo'
+
+      - name: get latest info
+        id: get_latest_info
+        run: |
+          echo "commit_date=$(git -C mihomo log -n 1 --format=%cs)" >> $GITHUB_OUTPUT
+          echo "commit_sha=$(git -C mihomo rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "short_commit_sha=$(git -C mihomo rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          git -C mihomo config tar.xz.command "xz -c"
+          git -C mihomo archive --output=mihomo.tar.xz HEAD
+          echo "checksum=$(sha256sum mihomo/mihomo.tar.xz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+  update:
+    needs:
+      - get_current_info
+      - get_latest_info
+    if: ${{ needs.get_current_info.outputs.pkg_source_version != needs.get_latest_info.outputs.commit_sha }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          repository: apoiston/openwrt-nikki
+          ref: main
+          path: openwrt-nikki
+
+      - name: update
+        run: |
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=1/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_SOURCE_DATE:=.*/PKG_SOURCE_DATE:=${{ needs.get_latest_info.outputs.commit_date }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=${{ needs.get_latest_info.outputs.commit_sha }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ needs.get_latest_info.outputs.checksum }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_BUILD_VERSION:=.*/PKG_BUILD_VERSION:=alpha-${{ needs.get_latest_info.outputs.short_commit_sha }}/" openwrt-nikki/nikki/Makefile
+
+      - name: commit
+        working-directory: openwrt-nikki
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add nikki/Makefile
+          git commit -m "build: update mihomo to ${{ needs.get_latest_info.outputs.short_commit_sha }}"
+          git push origin main
+  
+  clean:
+    needs: update
+    name: clean
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: delete workflow runs
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 1
+          
