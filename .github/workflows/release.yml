@@ -71,6 +71,13 @@ jobs:
           ref: main
           path: openwrt-nikki
 
+      - name: checkout nikki-geodata
+        uses: actions/checkout@v4
+        with:
+          repository: apoiston/nikki-geodata
+          ref: main
+          path: nikki-geodata
+
       - name: update version
         run: |
           sed -i "s/PKG_SOURCE_DATE:=.*/PKG_SOURCE_DATE:=${{ needs.get_latest_info.outputs.commit_date }}/" openwrt-nikki/nikki/Makefile
@@ -88,7 +95,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
           FEEDNAME: apps
-          PACKAGES: luci-app-nikki
+          PACKAGES: luci-app-nikki nikki-geodata
           INDEX: 1
           NO_REFRESH_CHECK: true
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
