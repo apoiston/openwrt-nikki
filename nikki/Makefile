@@ -1,15 +1,15 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nikki
-PKG_VERSION:=2025.06.25
+PKG_VERSION:=2025.07.05~6a620ba
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/MetaCubeX/mihomo.git
-PKG_SOURCE_VERSION:=v1.19.11
-PKG_MIRROR_HASH:=93b70bba67852d2a2eb6549b8d0b3d441aabfe68e9c9c72998f95c82fa27d8ac
+PKG_SOURCE_VERSION:=Alpha
+PKG_MIRROR_HASH:=ea23e9245dd7ad8bc1ca5e7a8463de995175ccb9cfb97e9fd8ba67514c55388a
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=Joseph Mory <morytyann@gmail.com>
@@ -18,10 +18,11 @@ PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
+PKG_BUILD_VERSION:=alpha-6a620ba
 PKG_BUILD_TIME:=$(shell date -u -Iseconds)
 
 GO_PKG:=github.com/metacubex/mihomo
-GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(PKG_SOURCE_VERSION) $(GO_PKG)/constant.BuildTime=$(PKG_BUILD_TIME)
+GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(PKG_BUILD_VERSION) $(GO_PKG)/constant.BuildTime=$(PKG_BUILD_TIME)
 GO_PKG_TAGS:=with_gvisor
 
 include $(INCLUDE_DIR)/package.mk
