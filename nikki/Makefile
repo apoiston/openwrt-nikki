@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nikki
-PKG_VERSION:=2025.09.08~0d3d31d
+PKG_VERSION:=2025.09.09~1d09ed8
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
@@ -9,7 +9,7 @@ PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/MetaCubeX/mihomo.git
 PKG_SOURCE_VERSION:=Alpha
-PKG_MIRROR_HASH:=524a5506dc15357322f35a7501e46437a7d78f01a6804c43abb33299e0276d7d
+PKG_MIRROR_HASH:=e895c5849f55ed207b6869d5399e4b21daa4ff5dda20cfa8b4d4d565f1bbae64
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=Joseph Mory <morytyann@gmail.com>
@@ -18,7 +18,7 @@ PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
-PKG_BUILD_VERSION:=alpha-0d3d31d
+PKG_BUILD_VERSION:=alpha-1d09ed8
 PKG_BUILD_TIME:=$(shell date -u -Iseconds)
 
 GO_PKG:=github.com/metacubex/mihomo
