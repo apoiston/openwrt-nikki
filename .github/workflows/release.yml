@@ -1,0 +1,196 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v*
+          
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    outputs:
+      latest_pkg_version: ${{ steps.extract.outputs.latest_pkg_version }}
+      latest_pkg_source_version: ${{ steps.extract.outputs.latest_pkg_source_version }}
+      latest_pkg_mirror_hash: ${{ steps.extract.outputs.latest_pkg_mirror_hash }}
+      short_commit_sha: ${{ steps.extract.outputs.short_commit_sha }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          repository: 'MetaCubeX/mihomo'
+          ref: 'Alpha'
+          path: 'mihomo'
+
+      - name: extract info
+        id: extract
+        run: |
+          commit_date=$(git -C mihomo log -n 1 --format="%cd" --date=format:"%Y.%m.%d")
+          short_commit_sha=$(git -C mihomo rev-parse --short HEAD)
+          git -C mihomo config tar.xz.command "xz -c"
+          git -C mihomo archive --output=$PWD/mihomo.tar.xz HEAD
+          echo "short_commit_sha=$short_commit_sha" >> $GITHUB_OUTPUT          
+          echo "latest_pkg_version=${commit_date}~${short_commit_sha}" >> $GITHUB_OUTPUT
+          echo "latest_pkg_source_version=Alpha" >> $GITHUB_OUTPUT
+          echo "latest_pkg_mirror_hash=$(sha256sum mihomo.tar.xz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+  build:
+    needs: fetch
+    name: build ${{ matrix.arch }}-${{ matrix.branch }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+        branch:
+          - SNAPSHOT
+          - openwrt-24.10
+
+    steps:
+      - name: set timezone
+        run: |
+          sudo timedatectl set-timezone Asia/Shanghai
+          date +"%Y-%m-%d %H:%M:%S"
+          
+      - name: system info
+        run: |
+          date +"%Y-%m-%d %H:%M:%S"
+          lscpu | grep -E '^Architecture|^CPU\(s\):|^Model name'
+          uname -sr
+          lsb_release -a
+          free -h
+          df -Th
+          
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          repository: apoiston/openwrt-nikki
+          ref: main
+          path: openwrt-nikki
+
+      - name: checkout nikki-geodata
+        uses: actions/checkout@v4
+        with:
+          repository: apoiston/nikki-geodata
+          ref: main
+          path: nikki-geodata
+
+      - name: checkout momo
+        uses: actions/checkout@v4
+        with:
+          repository: nikkinikki-org/OpenWrt-momo
+          ref: main
+          path: openwrt-momo
+
+      - name: update
+        run: |
+          if ! grep -q "PKG_BUILD_VERSION:=" openwrt-nikki/nikki/Makefile; then
+              sed -i '/PKG_BUILD_TIME:=/i PKG_BUILD_VERSION:=' openwrt-nikki/nikki/Makefile
+          fi
+          sed -i '/GO_PKG_LDFLAGS_X:=/ s/PKG_SOURCE_VERSION/PKG_BUILD_VERSION/' openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ needs.fetch.outputs.latest_pkg_version }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=${{ needs.fetch.outputs.latest_pkg_source_version }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ needs.fetch.outputs.latest_pkg_mirror_hash }}/" openwrt-nikki/nikki/Makefile
+          sed -i "s/PKG_BUILD_VERSION:=.*/PKG_BUILD_VERSION:=alpha-${{ needs.fetch.outputs.short_commit_sha }}/" openwrt-nikki/nikki/Makefile
+
+      - name: show info
+        run: |
+          ls -l $GITHUB_WORKSPACE
+          grep -o 'PKG_VERSION:.*' openwrt-nikki/nikki/Makefile | cut -d '=' -f 2
+          grep -o 'PKG_BUILD_VERSION:.*' openwrt-nikki/nikki/Makefile | cut -d '=' -f 2
+
+      - name: build
+        uses: apoiston/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
+          FEEDNAME: apps
+          PACKAGES: luci-app-nikki nikki-geodata luci-app-momo
+          INDEX: 1
+          NO_REFRESH_CHECK: true
+          KEY_BUILD: ${{ secrets.KEY_BUILD }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PUBLIC_KEY: ${{ secrets.PUBLIC_KEY }}
+          
+      - name: compress
+        run: |
+          tar -c -z -f nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/nikki .
+          mkdir -p public/${{ matrix.branch }}/${{ matrix.arch }}
+          mv bin/packages/${{ matrix.arch }}/apps public/${{ matrix.branch }}/${{ matrix.arch }}
+          tar -c -z -f apps_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
+
+      - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
+        name: release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: apps_${{ matrix.arch }}-${{ matrix.branch }}
+          path: apps_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
+
+  deploy:
+    needs: build
+    name: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: download
+        uses: actions/download-artifact@v4
+        with:
+          pattern: apps_*
+          merge-multiple: true
+      
+      - name: uncompress
+        run: |
+          for file in apps_*.tar.gz; do tar -x -z -f "$file"; done
+      
+      - name: prepare
+        continue-on-error: true
+        run: |
+          echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
+          echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
+          git clone --branch apps --depth=1 --quiet https://github.com/apoiston/index.git
+          sed -i "s/N\/A/$(date +"%Y-%m-%d %H:%M:%S")/g" index/index.html
+          git clone --branch main --single-branch --depth=1 --quiet https://github.com/apoiston/apps.git
+          cp -a index/*.{html,css,js} apps/*.sh public/
+          ls -l public
+
+      # - name: deploy gh pages
+      #   uses: peaceiris/actions-gh-pages@v4
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_branch: apps
+      #     publish_dir: ./public
+      #     force_orphan: true
+      #     commit_message: "release: ${{ github.ref_name }}"
+
+      - name: deploy cf pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy public --project-name=infinityapps --branch=apps
+
+  clean:
+    needs: deploy
+    name: clean
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: clean
+        uses: apoiston/actions@clean
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        with:
+          project_name: "infinityapps"
+          days_old: "7"
